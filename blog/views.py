@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from blog.models import Comment, Post, Tag
-from django.db.models import Count
+from django.db.models import Count, Prefetch
 
 
 def get_likes_count(post):
@@ -34,8 +34,8 @@ def serialize_post_optimized(post):
         'image_url': post.image.url if post.image else None,
         'published_at': post.published_at,
         'slug': post.slug,
-        'tags': [serialize_tag(tag) for tag in post.tags.annotate(Count('posts'))],
-        'first_tag_title': post.tags.all()[0].title,
+        'tags': [serialize_tag(tag) for tag in post.tags.all()],
+        'first_tag_title': post.tags.first().title,
     }
 
 
@@ -43,16 +43,24 @@ def serialize_tag(tag):
     return {
         'title': tag.title,
         'posts_with_tag': tag.posts__count,
+    }   
+
+
+def serialize_tag_optimized(tag):
+    return {
+        'title': tag.title,
+        'posts_with_tag': tag.posts__count,
     }
 
 
 def index(request):
+    prefetch = Prefetch('tags', queryset=Tag.objects.annotate(Count('posts')))
+
     most_popular_posts = Post.objects.popular() \
-                                     .prefetch_related('author', 'tags')[:5] \
+                                     .prefetch_related('author', prefetch)[:5] \
                                      .fetch_with_comments_count()
     
-    fresh_posts = Post.objects.annotate(Count('comments')).order_by('-published_at')
-    most_fresh_posts = fresh_posts[:5].prefetch_related('author')
+    most_fresh_posts = Post.objects.prefetch_related('author', prefetch).annotate(Count('comments')).order_by('-published_at')[:5]
 
     popular_tags = Tag.objects.popular()
     most_popular_tags = popular_tags[:5]
@@ -62,7 +70,7 @@ def index(request):
             serialize_post_optimized(post) for post in most_popular_posts
         ],
         'page_posts': [serialize_post_optimized(post) for post in most_fresh_posts],
-        'popular_tags': [serialize_tag(tag) for tag in most_popular_tags],
+        'popular_tags': [serialize_tag_optimized(tag) for tag in most_popular_tags],
     }
     return render(request, 'index.html', context)
 
