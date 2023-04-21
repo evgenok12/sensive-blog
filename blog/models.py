@@ -10,6 +10,7 @@ class PostQuerySet(models.QuerySet):
         return pupular_posts
 
     def fetch_with_comments_count(self):
+        '''Use it if you want to use multiply annotate'''
         posts_ids = [post.id for post in self]
         posts_with_comments = Post.objects.filter(id__in=posts_ids).annotate(Count('comments'))
         posts_ids_and_comments = posts_with_comments.values_list('id', 'comments__count')
