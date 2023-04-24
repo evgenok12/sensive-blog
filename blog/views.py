@@ -57,7 +57,7 @@ def post_detail(request, slug):
             'author': comment.author.username,
         })
 
-    likes = post.likes.count()
+    post_with_likes_number = Post.objects.annotate(Count('likes')).filter(id=post.id).first()
 
     related_tags = post.tags.annotate(Count('posts'))
 
@@ -66,7 +66,7 @@ def post_detail(request, slug):
         'text': post.text,
         'author': post.author.username,
         'comments': serialized_comments,
-        'likes_amount': likes,
+        'likes_amount': post_with_likes_number.likes__count,
         'image_url': post.image.url if post.image else None,
         'published_at': post.published_at,
         'slug': post.slug,
